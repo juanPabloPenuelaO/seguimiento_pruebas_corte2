@@ -1,1 +1,65 @@
+name: CI/CD Laravel
 
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_DB: gestor_libros
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: 1234
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2'
+
+    - name: Install Composer Dependencies
+      run: composer install
+
+    - name: Setup Environment File
+      run: |
+        cp .env.example .env
+        php artisan key:generate
+
+    - name: Wait for PostgreSQL
+      run: sleep 10
+
+    - name: Run Migrations
+      env:
+        DB_CONNECTION: pgsql
+        DB_HOST: 127.0.0.1
+        DB_PORT: 5432
+        DB_DATABASE: gestor_libros
+        DB_USERNAME: postgres
+        DB_PASSWORD: 1234
+      run: php artisan migrate --force
+
+    - name: Run Tests
+      env:
+        DB_CONNECTION: pgsql
+        DB_HOST: 127.0.0.1
+        DB_PORT: 5432
+        DB_DATABASE: gestor_libros
+        DB_USERNAME: postgres
+        DB_PASSWORD: 1234
+      run: php artisan test
+
+    - name: Deployment Ready
+      if: success()
+      run: echo "DEPLOYMENT APPROVED - ALL TESTS SUCCESSFUL!"
